@@ -105,6 +105,29 @@ namespace PartySystems.UIParty
             }
         }
 
+        private void UnloadViewLibrary(UIViewLibrary views)
+        {
+            for(int i=0, count=views.Views.Count; i<count; i++)
+            {
+                List<NullableReference<UIView>> foundRefs = m_activeViews.FindAll((nr) => nr.Reference.GetType() == views.Views[i].GetType());
+                if(foundRefs.Count > 0)
+                {
+                    for(int m=0, count2=foundRefs.Count; m<count2; m++)
+                    {
+                        foundRefs[i].Reference.CloseView();
+                    }
+                }
+
+                if(m_viewsMap.ContainsKey(views.Views[i].GetType()))
+                {
+                    m_viewsMap.Remove(views.Views[i].GetType());
+                }
+            }
+
+            m_activeViewLibraries.Remove(views);
+            
+        }
+
         private void Update()
         {
             for (int i = m_activeViews.Count - 1; i >= 0; i--)
@@ -121,30 +144,47 @@ namespace PartySystems.UIParty
             }
         }
 
-        public SharedNullableReference<T> GetHUD<T>() where T : UIView
+        /// <summary>
+        /// Get an Active UIView of type T. If it doesn't exist, it will create the view with the given priority (MediumRender if priority is null)
+        /// If the View exist and a priority was given, the method will update the View priority.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public SharedNullableReference<T> GetHUD<T>(EViewPriority? newPriority = null) where T : UIView
         {
             Type viewType = typeof(T);
             NullableReference<T> requestedView = m_activeViews.Find((x) => x.Reference.GetType() == viewType) as NullableReference<T>;
             if(requestedView != null)
             {
-                return requestedView.MakeShardRef();
+                if(newPriority != null)
+                {
+                    requestedView.Reference.transform.SetParent(m_priorityParentDict[newPriority.Value], false);
+                }
+                return requestedView.MakeSharedRef();
             }else
             {
-                return RequestView<T>();
+                return RequestView<T>(newPriority != null ? newPriority.Value : EViewPriority.MediumRenderPriority);
             }
         }
 
+        /// <summary>
+        /// Will instantiate (from a pool) a UIView of type T (if exist) and it will return a SharedRef of the View.
+        /// When the UIView is closed, the SharedRef will be automaticaly set to null.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="priority">Render order for the View</param>
+        /// <returns></returns>
         public SharedNullableReference<T> RequestView<T>(EViewPriority priority = EViewPriority.MediumRenderPriority) where T : UIView
         {
             if (m_viewsMap.ContainsKey(typeof(T)))
             {
                 T requestedView = m_viewPool.GetObject<T>(m_viewsMap[typeof(T)] as T);
                 requestedView.transform.SetParent(m_priorityParentDict[priority], false);
-                requestedView.gameObject.SetActive(false);
-                NullableReference<T> newNullableRef = new NullableReference<T>(requestedView);
-                m_activeViews.Add(requestedView as NullableReference<UIView>);
+                requestedView.gameObject.SetActive(false);                
+                NullableReference<UIView> newNullableRef = new NullableReference<UIView>(requestedView);
+                m_activeViews.Add(newNullableRef);
                 requestedView.RegisterOnFinishClosing(OnViewClosed);
-                return newNullableRef.MakeShardRef();
+                return newNullableRef.MakeSharedRefAs<T>();
             }
 
             return null;

@@ -29,9 +29,14 @@ namespace PartySystems.Utils
             m_sharedRefSignals?.Invoke();
         }
 
-        public SharedNullableReference<T> MakeShardRef()
+        public SharedNullableReference<T> MakeSharedRef()
         {
             return new SharedNullableReference<T>(m_ref, m_sharedRefSignals);
+        }
+
+        public SharedNullableReference<P> MakeSharedRefAs<P>() where P : class, T
+        {
+            return new SharedNullableReference<P>(m_ref as P, m_sharedRefSignals);
         }
 
         public static implicit operator T(NullableReference<T> reference)
